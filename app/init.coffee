@@ -24,7 +24,9 @@ listenActions = ->
 
   canvas.on 'click', (e)->
     if editingNote
-      editingNote.innerHTML = $('textarea', editingNote)[0].value
+      text = $('textarea', editingNote).val()
+      console.log text
+      editingNote.innerHTML = jQuery('<div>').text(text).html()
       style = extractStyle(editingNote)
       console.log editingNote.innerHTML
       todoItemTable.update(
@@ -68,7 +70,7 @@ listenActions = ->
     return unless drawing
     x = e.pageX
     y = e.pageY
-    if (beginX - x)*(beginX - x) + (beginY - y)*(beginY - y) < 100
+    if (beginX - x)*(beginX - x) + (beginY - y)*(beginY - y) < 200
       return
 
     context = this.getContext("2d")
@@ -106,6 +108,24 @@ listenActions = ->
   $('#dialog_no').click ->
     $('#dialog').hide()
 
+  $('#color_panel').on('click', ->
+    if this.className == 'inactive'
+      this.className = "active"
+    else
+      this.className = 'inactive'
+  )
+
+  $('#color_panel div').on('click', ->
+    parent = $('#color_panel').first()
+    if parent.hasClass 'inactive'
+      return
+    tmp = document.createElement 'div'
+    current = parent.children()[2]
+    parent[0].replaceChild(tmp, this)
+    parent[0].replaceChild(this, current)
+    parent[0].replaceChild(current, tmp)
+    noteColor = $(this).css('backgroundColor')
+  )
 
 strokeStrike = (x,y)->
   canvas = $('#canvas')[0]
@@ -125,7 +145,7 @@ init = ->
 
 refreshTodoItems = ->
   query = todoItemTable.where({complete: false}).read().then( (items)->
-    $('div.note').remove()
+    $('.note').remove()
     for item in items
       div = document.createElement("div")
       div.className = "note"
@@ -172,7 +192,7 @@ refreshTodoItems = ->
           $(tarea).height( $(this).height() )
           this.innerHTML = ""
           this.appendChild tarea
-          tarea.focus()
+          tarea.select()
         , 500)
       else
         noteClickCount = 0
