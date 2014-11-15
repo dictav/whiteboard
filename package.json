@@ -3,8 +3,10 @@
     "version": "1.0.0",
     "devDependencies": {
         "coffee-script": "*",
+        "main-bower-files": "*",
         "gulp": "*",
         "gulp-coffee": "*",
+        "gulp-filter": "*",
         "gulp-concat": "*",
         "gulp-plumber": "*",
         "gulp-sourcemaps": "*",
