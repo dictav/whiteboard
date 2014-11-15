@@ -1,5 +1,6 @@
 todoItemTable = null
 editingNote = null
+deletingNote = null
 
 noteColor = "red"
 noteWidth = "100px"
@@ -92,6 +93,20 @@ listenActions = ->
       else return
     drawing = false
 
+  $('#dialog_yes').click ->
+    if deletingNote
+      todoItemTable.update(
+        id: deletingNote.id
+        complete: true
+      ).then( ->
+        console.log 'completed'
+        refreshTodoItems()
+      , handleError)
+    $('#dialog').hide()
+  $('#dialog_no').click ->
+    $('#dialog').hide()
+
+
 strokeStrike = (x,y)->
   canvas = $('#canvas')[0]
   context = canvas.getContext("2d")
@@ -110,7 +125,7 @@ init = ->
 
 refreshTodoItems = ->
   query = todoItemTable.where({complete: false}).read().then( (items)->
-    $('div').remove()
+    $('div.note').remove()
     for item in items
       div = document.createElement("div")
       div.className = "note"
@@ -135,7 +150,6 @@ refreshTodoItems = ->
         f = this == editingNote
         editingNote.innerHTML = $('textarea', editingNote)[0].value
         style = extractStyle(editingNote)
-        console.log 'ore'
         todoItemTable.update(
           id: editingNote.id,
           style: JSON.stringify(style),
@@ -143,22 +157,32 @@ refreshTodoItems = ->
         ).then( ->
           console.log 'updated'
         , handleError)
-
         editingNote = null
+        noteClickCount = 0
         return if f
 
-      setTimeout( ()=>
-        clickCount = 0
-        editingNote = this
-        tarea = document.createElement('textarea')
-        tarea.value = this.innerHTML
-        $(tarea).width( $(this).width() )
-        $(tarea).height( $(this).height() )
-        this.innerHTML = ""
-        this.appendChild tarea
-        tarea.focus()
-      , 500)
-      )
+      noteClickCount++
+      if noteClickCount == 1
+        noteTimer = setTimeout( ()=>
+          noteClickCount = 0
+          editingNote = this
+          tarea = document.createElement('textarea')
+          tarea.value = this.innerHTML
+          $(tarea).width( $(this).width() )
+          $(tarea).height( $(this).height() )
+          this.innerHTML = ""
+          this.appendChild tarea
+          tarea.focus()
+        , 500)
+      else
+        noteClickCount = 0
+        clearTimeout(noteTimer)
+        deletingNote = this
+        $('#dialog').show()
+
+    ).on('dblclick', (e)->
+      e.preventDefault
+    )
   , handleError)
 
 handleError = (error) ->
