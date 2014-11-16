@@ -24,11 +24,11 @@ listenActions = ->
 
   canvas.on 'click', (e)->
     if editingNote
-      text = $('textarea', editingNote).val()
-      console.log text
-      editingNote.innerHTML = jQuery('<div>').text(text).html()
+      tarea = $('textarea', editingNote).first()
+      editingNote.innerHTML = jQuery('<div>').text(tarea.val()).html()
+      $(editingNote).width(tarea.width())
+      $(editingNote).height(tarea.height())
       style = extractStyle(editingNote)
-      console.log editingNote.innerHTML
       todoItemTable.update(
         id: editingNote.id,
         style: JSON.stringify(style),
@@ -146,10 +146,28 @@ init = ->
 refreshTodoItems = ->
   query = todoItemTable.where({complete: false}).read().then( (items)->
     $('.note').remove()
+
+    imgRegex = /^https?:\/\/(?:[a-z0-9\-_]+\.)+[a-z]{2,6}(?:\/[^\/#?]+)+\.(?:jpe?g|gif|png)$/
+    ytRegex = /^https?:\/\/www.youtube.com\/watch\?v=(.+)/
     for item in items
       div = document.createElement("div")
       div.className = "note"
-      div.innerHTML = item.text
+      if m = item.text.match ytRegex
+        console.log('youtube', m[1])
+        iframe = document.createElement 'iframe'
+        iframe.className = 'youtube-player'
+        iframe.type = "text/html"
+        iframe.src ="http://www.youtube.com/embed/" + m[1] + "?rel=0"
+        $(iframe).attr("frameborder", "0")
+        $(iframe).attr("autoplay", "1")
+        div.appendChild iframe
+      else if item.text.match(imgRegex)
+        img = document.createElement 'img'
+        img.src = item.text
+        div.appendChild img
+      else
+        console.log 'not match'
+        div.innerHTML = item.text
       div.id = item.id
       style = JSON.parse(item.style)
       $(div).css(style)
@@ -214,10 +232,11 @@ insertNewItem = (text, style)->
     .then( refreshTodoItems, handleError)
 
 extractStyle = (dom)->
+  console.log $(dom).height(), $(dom).width()
   {
     backgroundColor: $(dom).css("backgroundColor"),
-    height:          $(dom).css("height"),
-    width:           $(dom).css("width"),
+    height:          $(dom).height(),
+    width:           $(dom).width(),
     left:            $(dom).css("left"),
     top:             $(dom).css("top")
   }
