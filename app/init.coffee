@@ -28,15 +28,7 @@ listenActions = ->
       editingNote.innerHTML = jQuery('<div>').text(tarea.val()).html()
       $(editingNote).width(tarea.width())
       $(editingNote).height(tarea.height())
-      style = extractStyle(editingNote)
-      todoItemTable.update(
-        id: editingNote.id,
-        style: JSON.stringify(style),
-        text: editingNote.innerHTML
-      ).then( ->
-        console.log 'updated'
-        refreshTodoItems()
-      , handleError)
+      updateNote(editingNote)
       editingNote = null
       return
 
@@ -71,7 +63,7 @@ listenActions = ->
     return unless drawing
     x = e.pageX
     y = e.pageY
-    if (beginX - x)*(beginX - x) + (beginY - y)*(beginY - y) < 200
+    if (beginX - x)**2 + (beginY - y)**2 < 300
       return
 
     context = this.getContext("2d")
@@ -138,66 +130,74 @@ strokeStrike = (x,y)->
   context.lineTo(x, y)
   context.stroke()
   context.closePath()
+
 init = ->
     client = new WindowsAzure.MobileServiceClient(
       'https://whiteboard.azure-mobile.net/',
       'ayQItbHiEURdZHPJXAyjjTrIRXWUog83')
     todoItemTable = client.getTable('todoitem')
 
+createYoutbue = (id)->
+  iframe = document.createElement 'iframe'
+  iframe.className = 'youtube-player'
+  iframe.type = "text/html"
+  iframe.src ="http://www.youtube.com/embed/" + id + "?rel=0"
+  $(iframe).attr("frameborder", "0")
+  $(iframe).attr("autoplay", "1")
+  iframe
+
+imgreg = /^https?:\/\/(?:[a-z0-9\-_]+\.)+[a-z]{2,6}(?:\/[^\/#?]+)+\.(?:jpe?g|gif|png)$/
+ytreg = /^https?:\/\/www.youtube.com\/watch\?v=(.+)/
+createContent = (item)->
+  if m = item.text.match ytreg
+    createYoutbue(m[1])
+  else if item.text.match(imgreg)
+    img = document.createElement 'img'
+    img.src = item.text
+    img
+  else
+    document.createTextNode(item.text)
+
+updateNote = (note)->
+  style = extractStyle(note)
+  todoItemTable.update(
+    id: note.id,
+    style: JSON.stringify(style)
+    text: note.innerHTML
+  ).then( ->
+    refreshTodoItems()
+  , handleError)
+
+appendNote = (item)->
+  div = document.createElement("div")
+  div.className = "note"
+  div.id = item.id
+  style = JSON.parse(item.style)
+  $(div).css(style)
+  div.appendChild createContent(item)
+  document.body.appendChild div
+
+replaceTextArea = (note)->
+  tarea = document.createElement('textarea')
+  tarea.value = note.innerHTML
+  $(tarea).width( $(note).width() )
+  $(tarea).height( $(note).height() )
+  note.innerHTML = ""
+  note.appendChild tarea
+
 refreshTodoItems = ->
   query = todoItemTable.where({complete: false}).read().then( (items)->
     $('.note').remove()
-
-    imgRegex = /^https?:\/\/(?:[a-z0-9\-_]+\.)+[a-z]{2,6}(?:\/[^\/#?]+)+\.(?:jpe?g|gif|png)$/
-    ytRegex = /^https?:\/\/www.youtube.com\/watch\?v=(.+)/
-    for item in items
-      div = document.createElement("div")
-      div.className = "note"
-      if m = item.text.match ytRegex
-        console.log('youtube', m[1])
-        iframe = document.createElement 'iframe'
-        iframe.className = 'youtube-player'
-        iframe.type = "text/html"
-        iframe.src ="http://www.youtube.com/embed/" + m[1] + "?rel=0"
-        $(iframe).attr("frameborder", "0")
-        $(iframe).attr("autoplay", "1")
-        div.appendChild iframe
-      else if item.text.match(imgRegex)
-        img = document.createElement 'img'
-        img.src = item.text
-        div.appendChild img
-      else
-        console.log 'not match'
-        div.innerHTML = item.text
-      div.id = item.id
-      style = JSON.parse(item.style)
-      $(div).css(style)
-      document.body.appendChild div
+    appendNote(item) for item in items
 
     $('.note').draggable(
-      stop: (e)->
-        style = extractStyle(this)
-        todoItemTable.update(
-          id: this.id,
-          style: JSON.stringify(style)
-        ).then( ->
-          console.log 'updated'
-          refreshTodoItems()
-        , handleError)
+      stop: (e)-> updateNote(this)
     ).on('click', ->
       $(this).css('z-index',999)
       if editingNote
         f = this == editingNote
         editingNote.innerHTML = $('textarea', editingNote)[0].value
-        style = extractStyle(editingNote)
-        todoItemTable.update(
-          id: editingNote.id,
-          style: JSON.stringify(style),
-          text: editingNote.innerHTML
-        ).then( ->
-          console.log 'updated'
-          refreshTodoItems()
-        , handleError)
+        updateNote(editingNote)
         editingNote = null
         noteClickCount = 0
         return if f
@@ -207,12 +207,7 @@ refreshTodoItems = ->
         noteTimer = setTimeout( ()=>
           noteClickCount = 0
           editingNote = this
-          tarea = document.createElement('textarea')
-          tarea.value = this.innerHTML
-          $(tarea).width( $(this).width() )
-          $(tarea).height( $(this).height() )
-          this.innerHTML = ""
-          this.appendChild tarea
+          replaceTextArea(editingNote)
           tarea.select()
         , 500)
       else
