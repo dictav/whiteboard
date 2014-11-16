@@ -35,6 +35,7 @@ listenActions = ->
         text: editingNote.innerHTML
       ).then( ->
         console.log 'updated'
+        refreshTodoItems()
       , handleError)
       editingNote = null
       return
@@ -181,6 +182,7 @@ refreshTodoItems = ->
           style: JSON.stringify(style)
         ).then( ->
           console.log 'updated'
+          refreshTodoItems()
         , handleError)
     ).on('click', ->
       $(this).css('z-index',999)
@@ -194,6 +196,7 @@ refreshTodoItems = ->
           text: editingNote.innerHTML
         ).then( ->
           console.log 'updated'
+          refreshTodoItems()
         , handleError)
         editingNote = null
         noteClickCount = 0
