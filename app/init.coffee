@@ -1,4 +1,5 @@
 todoItemTable = null
+strokePathTable = null
 editingNote = null
 deletingNote = null
 
@@ -12,8 +13,10 @@ noteClickCount = 0
 noteTimer  = null
 noteEditing = false
 drawing = false
-beginX = 0
-beginY = 0
+strokePaths = []
+strokePaths.last = ()->
+  this[this.length-1]
+
 
 timer = null
 
@@ -33,7 +36,7 @@ listenActions = ->
       return
 
     if drawing
-      drawing = false
+      insertNewPath(strokePaths)
       return
 
     clickCount++
@@ -48,13 +51,13 @@ listenActions = ->
           width:  noteWidth,
           height: noteHeight,
           backgroundColor: noteColor
-        insertNewItem("create a new note", JSON.stringify style)
+        insertNewItem("create a new note", JSON.stringify(style))
       , 300)
     else
       clickCount = 0
       drawing = true
-      beginX = e.pageX
-      beginY = e.pageY
+      strokePaths.length = 0
+      strokePaths.push {x: e.pageX, y: e.pageY}
       clearTimeout timer
    .on 'dblclick', (e)->
     e.preventDefault()
@@ -63,30 +66,30 @@ listenActions = ->
     return unless drawing
     x = e.pageX
     y = e.pageY
-    if (beginX - x)**2 + (beginY - y)**2 < 300
+    if (strokePaths.last().x - x)**2 + (strokePaths.last().y - y)**2 < 300
       return
 
     context = this.getContext("2d")
-    context.strokeStyle = lineColor
-    context.lineWidth = lineWidth
-    context.beginPath()
-    context.moveTo(beginX, beginY)
-    context.lineTo(x, y)
-    context.stroke()
-    context.closePath()
-    beginX = x
-    beginY = y
+    console.log 'stroke'
+    drawStroke(context, x, y)
+    strokePaths.push {x: x, y: y}
 
   $(document).on 'keyup', (e)->
     return unless drawing
 
+    path = null
     switch e.keyCode
-      when 37 then strokeStrike(0,beginY)
-      when 38 then strokeStrike(beginX,0)
-      when 39 then strokeStrike($(this).width(),beginY)
-      when 40 then strokeStrike(beginX,$(this).height())
-      else return
-    drawing = false
+      when 37 then path = {x:0, y:strokePaths.last().y}
+      when 38 then path = {x:strokePaths.last().x, y:0}
+      when 39 then path = {x:$(this).width(), y:strokePaths.last().y}
+      when 40 then path = {x:strokePaths.last().x, y:$(this).height()}
+      else
+        return
+    context = $('canvas')[0].getContext('2d')
+    drawStroke(context, path.x, path.y)
+    strokePaths.push path
+    insertNewPath(strokePaths)
+
 
   $('#dialog_yes').click ->
     if deletingNote
@@ -120,13 +123,11 @@ listenActions = ->
     noteColor = $(this).css('backgroundColor')
   )
 
-strokeStrike = (x,y)->
-  canvas = $('#canvas')[0]
-  context = canvas.getContext("2d")
+drawStroke = (context, x, y)->
   context.strokeStyle = lineColor
   context.lineWidth = lineWidth
   context.beginPath()
-  context.moveTo(beginX, beginY)
+  context.moveTo(strokePaths.last().x, strokePaths.last().y)
   context.lineTo(x, y)
   context.stroke()
   context.closePath()
@@ -136,6 +137,7 @@ init = ->
       'https://whiteboard.azure-mobile.net/',
       'ayQItbHiEURdZHPJXAyjjTrIRXWUog83')
     todoItemTable = client.getTable('todoitem')
+    strokePathTable = client.getTable('strokepath')
 
 createYoutbue = (id)->
   iframe = document.createElement 'iframe'
@@ -185,6 +187,21 @@ replaceTextArea = (note)->
   note.innerHTML = ""
   note.appendChild tarea
 
+refreshStrokePaths = ->
+  query = strokePathTable.where( -> this.data != null ).read().then (strokes)->
+    context = $('canvas')[0].getContext('2d')
+    for stroke in strokes 
+      context.strokeStyle = stroke.color
+      context.lineWidth = stroke.width
+      paths = JSON.parse stroke.data
+      fpath = paths.shift
+      context.beginPath()
+      context.moveTo(fpath.x, fpath.y)
+      for path in paths
+        context.lineTo(path.x, path.y)
+        context.stroke()
+      context.closePath()
+
 refreshTodoItems = ->
   query = todoItemTable.where({complete: false}).read().then( (items)->
     $('.note').remove()
@@ -224,6 +241,17 @@ refreshTodoItems = ->
 handleError = (error) ->
   console.log "ERR",error
 
+insertNewPath = (data) ->
+  console.log 'insert path'
+  drawing = false
+  strokePathTable.insert({
+    width: lineWidth,
+    color: lineColor,
+    data: JSON.stringify(data)
+  }).then( ->
+      console.log 'path was inserted'
+    , handleError)
+
 insertNewItem = (text, style)->
   console.log 'insert'
   todoItemTable.insert({ text: text, style: style, complete: false })
@@ -243,4 +271,5 @@ $(document).ready ->
   init()
   listenActions()
   refreshTodoItems()
+  refreshStrokePaths()
 
