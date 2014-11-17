@@ -1,19 +1,21 @@
 {
-    "name": "gulp-coffee-sass",
-    "version": "1.0.0",
-    "devDependencies": {
-        "coffee-script": "*",
-        "main-bower-files": "*",
-        "gulp": "*",
-        "gulp-coffee": "*",
-        "gulp-filter": "*",
-        "gulp-concat": "*",
-        "gulp-plumber": "*",
-        "gulp-notify": "*",
-        "gulp-sourcemaps": "*",
-        "gulp-jade": "*",
-        "gulp-less": "*",
-        "gulp-connect": "*",
-        "gulp-livereload": "*"
-    }
+  "name": "gulp-coffee-sass",
+  "version": "1.0.0",
+  "devDependencies": {
+    "coffee-script": "*",
+    "gulp": "*",
+    "gulp-coffee": "*",
+    "gulp-concat": "*",
+    "gulp-connect": "*",
+    "gulp-filter": "*",
+    "gulp-jade": "*",
+    "gulp-less": "*",
+    "gulp-livereload": "*",
+    "gulp-minify-css": "^0.3.11",
+    "gulp-notify": "*",
+    "gulp-plumber": "*",
+    "gulp-sourcemaps": "*",
+    "gulp-uglify": "^1.0.1",
+    "main-bower-files": "*"
+  }
 }
