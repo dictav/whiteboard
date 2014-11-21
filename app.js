@@ -1,46 +1,81 @@
-var canvasListner, clickCount, handleError, init, listenActions, timer;
+var canvasClickListner, canvasHoldListner, canvasListner, canvasTimer, clickCount, handleError, init, listenActions, timer;
 
 clickCount = 0;
 
 timer = null;
+
+canvasTimer = null;
+
+canvasClickListner = function(e) {
+  if ($(this).hasClass('noclick')) {
+    $(this).removeClass('noclick');
+    return;
+  }
+  if (Note.editingNote) {
+    Note.editingNote.setEditing(false);
+    return;
+  }
+  if (Stroke.drawingStroke) {
+    Stroke.drawingStroke.save();
+    return;
+  }
+  clickCount++;
+  console.log('canvas click count', clickCount);
+  if (clickCount === 1) {
+    return timer = setTimeout(function() {
+      clickCount = 0;
+      return Note.create("create a new note", {
+        top: e.pageY,
+        left: e.pageX
+      });
+    }, 300);
+  } else {
+    clickCount = 0;
+    Stroke.drawingStroke = Stroke.create({
+      x: e.pageX,
+      y: e.pageY
+    });
+    return clearTimeout(timer);
+  }
+};
+
+canvasHoldListner = function(e) {
+  if (e.type === 'mousedown') {
+    canvasTimer = setTimeout((function(_this) {
+      return function() {
+        var p, s, _i, _j, _len, _len1, _ref, _ref1;
+        $(_this).addClass('noclick');
+        _ref = Stroke.allStrokes;
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          s = _ref[_i];
+          _ref1 = s.paths;
+          for (_j = 0, _len1 = _ref1.length; _j < _len1; _j++) {
+            p = _ref1[_j];
+            if (Math.pow(p.x - e.pageX, 2) + Math.pow(p.y - e.pageY, 2) < 300) {
+              console.log('clear', s);
+              s["delete"]();
+              Stroke.refresh();
+              canvasTimer = null;
+              return;
+            }
+          }
+        }
+        return console.log('NOT HOGE');
+      };
+    })(this), 900);
+  }
+  if (e.type === 'mouseup' && canvasTimer) {
+    console.log('cancel clear');
+    clearTimeout(canvasTimer);
+    return canvasTimer = null;
+  }
+};
 
 canvasListner = function() {
   var canvas;
   canvas = $('#canvas');
   canvas.attr('width', canvas.width());
   canvas.attr('height', canvas.height());
-  canvas.on('click', function(e) {
-    if (Note.editingNote) {
-      Note.editingNote.setEditing(false);
-      return;
-    }
-    if (Stroke.drawingStroke) {
-      Stroke.drawingStroke.save();
-      return;
-    }
-    clickCount++;
-    console.log('canvas click count', clickCount);
-    if (clickCount === 1) {
-      return timer = setTimeout(function() {
-        var style;
-        clickCount = 0;
-        style = {
-          top: e.pageY,
-          left: e.pageX
-        };
-        return Note.create("create a new note", style);
-      }, 300);
-    } else {
-      clickCount = 0;
-      Stroke.drawingStroke = Stroke.create({
-        x: e.pageX,
-        y: e.pageY
-      });
-      return clearTimeout(timer);
-    }
-  }).on('dblclick', function(e) {
-    return e.preventDefault();
-  });
   canvas.on('mousemove', function(e) {
     if (!Stroke.drawingStroke) {
       return;
@@ -49,7 +84,9 @@ canvasListner = function() {
       x: e.pageX,
       y: e.pageY
     });
-  });
+  }).on('dblclick', function(e) {
+    return e.preventDefault();
+  }).on('click', canvasClickListner).on('mousedown mouseup', canvasHoldListner);
   return $(document).on('keyup', function(e) {
     var path, stroke;
     console.log('keyup', e.keyCode);
@@ -338,6 +375,17 @@ window.Note = (function() {
     }
   };
 
+  Note.prototype.replaceTextArea = function() {
+    var tarea;
+    tarea = document.createElement('textarea');
+    tarea.value = this.item.text;
+    $(tarea).width($(this.view).width());
+    $(tarea).height($(this.view).height());
+    this.view.innerHTML = "";
+    this.view.appendChild(tarea);
+    return tarea.select();
+  };
+
   extractStyle = function(dom) {
     return {
       backgroundColor: $(dom).css("backgroundColor"),
@@ -346,17 +394,6 @@ window.Note = (function() {
       left: $(dom).css("left"),
       top: $(dom).css("top")
     };
-  };
-
-  Note.prototype.replaceTextArea = function() {
-    var tarea;
-    tarea = document.createElement('textarea');
-    tarea.value = this.view.innerHTML;
-    $(tarea).width($(this.view).width());
-    $(tarea).height($(this.view).height());
-    this.view.innerHTML = "";
-    this.view.appendChild(tarea);
-    return tarea.select();
   };
 
   createContent = function(div, src) {
@@ -400,13 +437,20 @@ window.Stroke = (function() {
       data: JSON.stringify([path])
     };
     stroke = new Stroke(data);
-    this.allStrokes.push(stroke);
+    Stroke.allStrokes.push(stroke);
     console.log('create stroke', stroke);
     return stroke;
   };
 
   Stroke.refresh = function() {
-    var condition, query;
+    var c, canvas, condition, query;
+    this.allStrokes = [];
+    canvas = $('canvas')[0];
+    c = canvas.getContext('2d');
+    c.save();
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, canvas.width, canvas.height);
+    c.restore();
     condition = function() {
       return this.data !== "";
     };
@@ -416,7 +460,7 @@ window.Stroke = (function() {
       _results = [];
       for (_i = 0, _len = strokes.length; _i < _len; _i++) {
         stroke = strokes[_i];
-        _results.push(this.allStokes = new Stroke(stroke));
+        _results.push(Stroke.allStrokes.push(new Stroke(stroke)));
       }
       return _results;
     });
@@ -472,23 +516,33 @@ window.Stroke = (function() {
 
   Stroke.prototype.insert = function() {
     var data;
-    console.log(this.stroke);
     data = {
       width: this.stroke.width,
       color: this.stroke.color,
       data: JSON.stringify(this.paths)
     };
     console.log('insert stroke', data);
-    return Stroke.table.insert(data).then(function(stroke) {
-      return console.log('inserted stroke', stroke);
-    }, handleError);
+    return Stroke.table.insert(data).then((function(_this) {
+      return function(stroke) {
+        _this.stroke.id = stroke.id;
+        return console.log('inserted stroke', stroke);
+      };
+    })(this), handleError);
   };
 
   Stroke.prototype.update = function(data) {
-    console.log(data);
     data.id = this.stroke.id;
     return Stroke.table.update(data).then(function(data) {
       return console.log('update stroke', data);
+    }, window.handleError);
+  };
+
+  Stroke.prototype["delete"] = function() {
+    console.log('delete stroke');
+    return Stroke.table.del({
+      id: this.stroke.id
+    }).then(function() {
+      return console.log('deleted stroke');
     }, window.handleError);
   };
 
