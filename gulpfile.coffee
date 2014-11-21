@@ -37,7 +37,7 @@ gulp.task 'coffee', ->
     .pipe coffee
         bare: true
     .pipe concat 'app.js'
-    .pipe uglify()
+    #.pipe uglify()
     .pipe sourcemaps.write '.',
         addComment: true
         sourceRoot: '/app'

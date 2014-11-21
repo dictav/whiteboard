@@ -1,46 +1,22 @@
-todoItemTable = null
-strokePathTable = null
-editingNote = null
-deletingNote = null
-
-noteColor = "red"
-noteWidth = "100px"
-noteHeight = "100px"
-lineColor = "rgba(0,0,0,0.5)"
-lineWidth = 8
 clickCount = 0
-noteClickCount = 0
-noteTimer  = null
-noteEditing = false
-drawing = false
-strokePaths = []
-strokePaths.last = ()->
-  this[this.length-1]
-
-
 timer = null
 
-listenActions = ->
+canvasListner = ->
   canvas = $('#canvas')
   canvas.attr('width', canvas.width())
   canvas.attr('height', canvas.height())
 
   canvas.on 'click', (e)->
-    if editingNote
-      tarea = $('textarea', editingNote).first()
-      editingNote.innerHTML = jQuery('<div>').text(tarea.val()).html()
-      $(editingNote).width(tarea.width())
-      $(editingNote).height(tarea.height())
-      updateNote(editingNote)
-      editingNote = null
+    if Note.editingNote
+      Note.editingNote.setEditing(false)
       return
 
-    if drawing
-      insertNewPath(strokePaths)
+    if Stroke.drawingStroke
+      Stroke.drawingStroke.save()
       return
 
     clickCount++
-    console.log 'click', clickCount
+    console.log 'canvas click count', clickCount
 
     if clickCount == 1
       timer = setTimeout( ()->
@@ -48,58 +24,41 @@ listenActions = ->
         style =
           top:    e.pageY,
           left:   e.pageX,
-          width:  noteWidth,
-          height: noteHeight,
-          backgroundColor: noteColor
-        insertNewItem("create a new note", JSON.stringify(style))
+        Note.create "create a new note", style
       , 300)
     else
       clickCount = 0
-      drawing = true
-      strokePaths.length = 0
-      strokePaths.push {x: e.pageX, y: e.pageY}
+      Stroke.drawingStroke = Stroke.create( {x: e.pageX, y: e.pageY} )
       clearTimeout timer
    .on 'dblclick', (e)->
     e.preventDefault()
 
   canvas.on 'mousemove', (e)->
-    return unless drawing
-    x = e.pageX
-    y = e.pageY
-    if (strokePaths.last().x - x)**2 + (strokePaths.last().y - y)**2 < 300
-      return
-
-    context = this.getContext("2d")
-    console.log 'stroke'
-    drawStroke(context, x, y)
-    strokePaths.push {x: x, y: y}
+    return unless Stroke.drawingStroke
+    Stroke.drawingStroke.addPath({x:e.pageX, y:e.pageY})
 
   $(document).on 'keyup', (e)->
-    return unless drawing
+    console.log 'keyup', e.keyCode
+    stroke = Stroke.drawingStroke
+    return unless stroke
 
     path = null
     switch e.keyCode
-      when 37 then path = {x:0, y:strokePaths.last().y}
-      when 38 then path = {x:strokePaths.last().x, y:0}
-      when 39 then path = {x:$(this).width(), y:strokePaths.last().y}
-      when 40 then path = {x:strokePaths.last().x, y:$(this).height()}
+      when 37 then path = {x:0, y:stroke.paths.last().y}
+      when 38 then path = {x:stroke.paths.last().x, y:0}
+      when 39 then path = {x:$(this).width(), y:stroke.paths.last().y}
+      when 40 then path = {x:stroke.paths.last().x, y:$(this).height()}
       else
         return
-    context = $('canvas')[0].getContext('2d')
-    drawStroke(context, path.x, path.y)
-    strokePaths.push path
-    insertNewPath(strokePaths)
+    stroke.addPath path
+    stroke.save()
 
+listenActions = ->
+  canvasListner()
 
   $('#dialog_yes').click ->
-    if deletingNote
-      todoItemTable.update(
-        id: deletingNote.id
-        complete: true
-      ).then( ->
-        console.log 'completed'
-        refreshTodoItems()
-      , handleError)
+    if Note.completeNote
+      Note.completeNote.complete()
     $('#dialog').hide()
   $('#dialog_no').click ->
     $('#dialog').hide()
@@ -120,156 +79,24 @@ listenActions = ->
     parent[0].replaceChild(tmp, this)
     parent[0].replaceChild(this, current)
     parent[0].replaceChild(current, tmp)
-    noteColor = $(this).css('backgroundColor')
+    Note.default.backgroundColor = $(this).css('backgroundColor')
   )
 
-drawStroke = (context, x, y)->
-  context.strokeStyle = lineColor
-  context.lineWidth = lineWidth
-  context.beginPath()
-  context.moveTo(strokePaths.last().x, strokePaths.last().y)
-  context.lineTo(x, y)
-  context.stroke()
-  context.closePath()
 
 init = ->
     client = new WindowsAzure.MobileServiceClient(
       'https://whiteboard.azure-mobile.net/',
       'ayQItbHiEURdZHPJXAyjjTrIRXWUog83')
-    todoItemTable = client.getTable('todoitem')
-    strokePathTable = client.getTable('strokepath')
-
-createYoutbue = (id)->
-  iframe = document.createElement 'iframe'
-  iframe.className = 'youtube-player'
-  iframe.type = "text/html"
-  iframe.src ="http://www.youtube.com/embed/" + id + "?rel=0"
-  $(iframe).attr("frameborder", "0")
-  $(iframe).attr("autoplay", "1")
-  iframe
-
-imgreg = /^https?:\/\/(?:[a-z0-9\-_]+\.)+[a-z]{2,6}(?:\/[^\/#?]+)+\.(?:jpe?g|gif|png)$/
-ytreg = /^https?:\/\/www.youtube.com\/watch\?v=(.+)/
-createContent = (item)->
-  if m = item.text.match ytreg
-    createYoutbue(m[1])
-  else if item.text.match(imgreg)
-    img = document.createElement 'img'
-    img.src = item.text
-    img
-  else
-    document.createTextNode(item.text)
-
-updateNote = (note)->
-  style = extractStyle(note)
-  todoItemTable.update(
-    id: note.id,
-    style: JSON.stringify(style)
-    text: note.innerHTML
-  ).then( ->
-    refreshTodoItems()
-  , handleError)
-
-appendNote = (item)->
-  div = document.createElement("div")
-  div.className = "note"
-  div.id = item.id
-  style = JSON.parse(item.style)
-  $(div).css(style)
-  div.appendChild createContent(item)
-  document.body.appendChild div
-
-replaceTextArea = (note)->
-  tarea = document.createElement('textarea')
-  tarea.value = note.innerHTML
-  $(tarea).width( $(note).width() )
-  $(tarea).height( $(note).height() )
-  note.innerHTML = ""
-  note.appendChild tarea
-
-refreshStrokePaths = ->
-  query = strokePathTable.where( -> this.data != null ).read().then (strokes)->
-    context = $('canvas')[0].getContext('2d')
-    for stroke in strokes 
-      context.strokeStyle = stroke.color
-      context.lineWidth = stroke.width
-      paths = JSON.parse stroke.data
-      fpath = paths.shift
-      context.beginPath()
-      context.moveTo(fpath.x, fpath.y)
-      for path in paths
-        context.lineTo(path.x, path.y)
-        context.stroke()
-      context.closePath()
-
-refreshTodoItems = ->
-  query = todoItemTable.where({complete: false}).read().then( (items)->
-    $('.note').remove()
-    appendNote(item) for item in items
-
-    $('.note').draggable(
-      stop: (e)-> updateNote(this)
-    ).on('click', ->
-      $(this).css('z-index',999)
-      if editingNote
-        f = this == editingNote
-        editingNote.innerHTML = $('textarea', editingNote)[0].value
-        updateNote(editingNote)
-        editingNote = null
-        noteClickCount = 0
-        return if f
-
-      noteClickCount++
-      if noteClickCount == 1
-        noteTimer = setTimeout( ()=>
-          noteClickCount = 0
-          editingNote = this
-          replaceTextArea(editingNote)
-          tarea.select()
-        , 500)
-      else
-        noteClickCount = 0
-        clearTimeout(noteTimer)
-        deletingNote = this
-        $('#dialog').show()
-
-    ).on('dblclick', (e)->
-      e.preventDefault
-    )
-  , handleError)
+    Note.table = client.getTable('todoitem')
+    Stroke.table = client.getTable('strokepath')
 
 handleError = (error) ->
   console.log "ERR",error
 
-insertNewPath = (data) ->
-  console.log 'insert path'
-  drawing = false
-  strokePathTable.insert({
-    width: lineWidth,
-    color: lineColor,
-    data: JSON.stringify(data)
-  }).then( ->
-      console.log 'path was inserted'
-    , handleError)
-
-insertNewItem = (text, style)->
-  console.log 'insert'
-  todoItemTable.insert({ text: text, style: style, complete: false })
-    .then( refreshTodoItems, handleError)
-
-extractStyle = (dom)->
-  console.log $(dom).height(), $(dom).width()
-  {
-    backgroundColor: $(dom).css("backgroundColor"),
-    height:          $(dom).height(),
-    width:           $(dom).width(),
-    left:            $(dom).css("left"),
-    top:             $(dom).css("top")
-  }
-
 $(document).ready ->
   init()
   listenActions()
-  refreshTodoItems()
-  refreshStrokePaths()
+  Note.refresh()
+  Note.deleteGomi()
+  Stroke.refresh()
 
