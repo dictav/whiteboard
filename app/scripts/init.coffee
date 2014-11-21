@@ -136,8 +136,8 @@ init = ->
     client = new WindowsAzure.MobileServiceClient(
       'https://whiteboard.azure-mobile.net/',
       'ayQItbHiEURdZHPJXAyjjTrIRXWUog83')
-    todoItemTable = client.getTable('todoitem')
-    strokePathTable = client.getTable('strokepath')
+    Note.table = client.getTable('todoitem')
+    Stroke.table = client.getTable('strokepath')
 
 createYoutbue = (id)->
   iframe = document.createElement 'iframe'
@@ -187,89 +187,13 @@ replaceTextArea = (note)->
   note.innerHTML = ""
   note.appendChild tarea
 
-refreshStrokePaths = ->
-  query = strokePathTable.where( -> this.data != null ).read().then (strokes)->
-    context = $('canvas')[0].getContext('2d')
-    for stroke in strokes 
-      context.strokeStyle = stroke.color
-      context.lineWidth = stroke.width
-      paths = JSON.parse stroke.data
-      fpath = paths.shift
-      context.beginPath()
-      context.moveTo(fpath.x, fpath.y)
-      for path in paths
-        context.lineTo(path.x, path.y)
-        context.stroke()
-      context.closePath()
-
-refreshTodoItems = ->
-  query = todoItemTable.where({complete: false}).read().then( (items)->
-    $('.note').remove()
-    appendNote(item) for item in items
-
-    $('.note').draggable(
-      stop: (e)-> updateNote(this)
-    ).on('click', ->
-      $(this).css('z-index',999)
-      if editingNote
-        f = this == editingNote
-        editingNote.innerHTML = $('textarea', editingNote)[0].value
-        updateNote(editingNote)
-        editingNote = null
-        noteClickCount = 0
-        return if f
-
-      noteClickCount++
-      if noteClickCount == 1
-        noteTimer = setTimeout( ()=>
-          noteClickCount = 0
-          editingNote = this
-          replaceTextArea(editingNote)
-          tarea.select()
-        , 500)
-      else
-        noteClickCount = 0
-        clearTimeout(noteTimer)
-        deletingNote = this
-        $('#dialog').show()
-
-    ).on('dblclick', (e)->
-      e.preventDefault
-    )
-  , handleError)
 
 handleError = (error) ->
   console.log "ERR",error
 
-insertNewPath = (data) ->
-  console.log 'insert path'
-  drawing = false
-  strokePathTable.insert({
-    width: lineWidth,
-    color: lineColor,
-    data: JSON.stringify(data)
-  }).then( ->
-      console.log 'path was inserted'
-    , handleError)
-
-insertNewItem = (text, style)->
-  console.log 'insert'
-  todoItemTable.insert({ text: text, style: style, complete: false })
-    .then( refreshTodoItems, handleError)
-
-extractStyle = (dom)->
-  console.log $(dom).height(), $(dom).width()
-  {
-    backgroundColor: $(dom).css("backgroundColor"),
-    height:          $(dom).height(),
-    width:           $(dom).width(),
-    left:            $(dom).css("left"),
-    top:             $(dom).css("top")
-  }
-
 $(document).ready ->
   init()
   listenActions()
-  refreshTodoItems()
-  refreshStrokePaths()
+  Note.refresh()
+  Strole.refresh()
 
