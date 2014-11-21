@@ -93,7 +93,8 @@ class window.Note
     createContent(div, @item.text)
     document.body.appendChild div
     @view = div
-    $(@view).on 'click', @clickHandler
+    $(@view)
+      .on 'click', @clickHandler
       .on 'dblclick', (e)-> e.preventDefault()
       .draggable
         stop: (e,ui)=>
@@ -131,6 +132,15 @@ class window.Note
       $('#dialog').show()
 
 
+  replaceTextArea: ->
+    tarea = document.createElement('textarea')
+    tarea.value = @item.text
+    $(tarea).width( $(@view).width() )
+    $(tarea).height( $(@view).height() )
+    @view.innerHTML = ""
+    @view.appendChild tarea
+    tarea.select()
+
   extractStyle = (dom)->
     {
       backgroundColor: $(dom).css("backgroundColor"),
@@ -139,15 +149,6 @@ class window.Note
       left:            $(dom).css("left"),
       top:             $(dom).css("top")
     }
-
-  replaceTextArea: ->
-    tarea = document.createElement('textarea')
-    tarea.value = @view.innerHTML
-    $(tarea).width( $(@view).width() )
-    $(tarea).height( $(@view).height() )
-    @view.innerHTML = ""
-    @view.appendChild tarea
-    tarea.select()
 
   createContent = (div, src)->
     content = if m = src.match Note.ytreg

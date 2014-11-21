@@ -13,16 +13,23 @@ class window.Stroke
       color: Stroke.default.color
       data: JSON.stringify [path]
     stroke = new Stroke(data)
-    @allStrokes.push stroke
+    Stroke.allStrokes.push stroke
     console.log 'create stroke', stroke
     stroke
 
   @refresh: ->
-    condition = -> this.data != ""
+    @allStrokes = []
+    canvas = $('canvas')[0]
+    c = canvas.getContext('2d')
+    c.save()
+    c.setTransform(1, 0, 0, 1, 0, 0)
+    c.clearRect(0, 0, canvas.width, canvas.height)
+    c.restore()
 
+    condition = -> this.data != ""
     query = Stroke.table.where(condition).read().then (strokes)->
       console.log 'strokes',strokes
-      @allStokes = new Stroke(stroke) for stroke in strokes
+      Stroke.allStrokes.push(new Stroke(stroke)) for stroke in strokes
 
   constructor: (@stroke)->
     @paths = JSON.parse @stroke.data
@@ -60,22 +67,28 @@ class window.Stroke
     @insert()
 
   insert: ->
-    console.log @stroke
     data =
       width: @stroke.width,
       color: @stroke.color,
       data: JSON.stringify(@paths)
     console.log 'insert stroke', data
     Stroke.table.insert(data)
-      .then (stroke)->
+      .then (stroke)=>
+        @stroke.id = stroke.id
         console.log 'inserted stroke', stroke
       , handleError
 
   update: (data)->
-    console.log data
     data.id = @stroke.id
     Stroke.table.update(data)
       .then (data)->
         console.log 'update stroke', data
+      , window.handleError
+
+  delete: ->
+    console.log 'delete stroke'
+    Stroke.table.del({id: @stroke.id})
+      .then ->
+        console.log 'deleted stroke'
       , window.handleError
 

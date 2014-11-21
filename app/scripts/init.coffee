@@ -1,41 +1,65 @@
 clickCount = 0
 timer = null
+canvasTimer = null
+
+canvasClickListner = (e)->
+  if $(this).hasClass 'noclick'
+    $(this).removeClass 'noclick'
+    return
+
+  if Note.editingNote
+    Note.editingNote.setEditing(false)
+    return
+
+  if Stroke.drawingStroke
+    Stroke.drawingStroke.save()
+    return
+
+  clickCount++
+  console.log 'canvas click count', clickCount
+
+  if clickCount == 1
+    timer = setTimeout( ()->
+      clickCount = 0
+      Note.create "create a new note", {top: e.pageY, left: e.pageX}
+    , 300)
+  else
+    clickCount = 0
+    Stroke.drawingStroke = Stroke.create {x: e.pageX, y: e.pageY}
+    clearTimeout timer
+
+canvasHoldListner = (e)->
+  if e.type == 'mousedown'
+    canvasTimer = setTimeout =>
+      $(this).addClass 'noclick'
+      for s in Stroke.allStrokes
+        for p in s.paths
+          if (p.x - e.pageX)**2 + (p.y - e.pageY)**2 < 300
+            console.log 'clear',s
+            s.delete()
+            Stroke.refresh()
+            canvasTimer = null
+            return
+      console.log 'NOT HOGE'
+    , 900
+  if e.type == 'mouseup' && canvasTimer
+    console.log 'cancel clear'
+    clearTimeout(canvasTimer)
+    canvasTimer = null
+
 
 canvasListner = ->
   canvas = $('#canvas')
   canvas.attr('width', canvas.width())
   canvas.attr('height', canvas.height())
 
-  canvas.on 'click', (e)->
-    if Note.editingNote
-      Note.editingNote.setEditing(false)
-      return
-
-    if Stroke.drawingStroke
-      Stroke.drawingStroke.save()
-      return
-
-    clickCount++
-    console.log 'canvas click count', clickCount
-
-    if clickCount == 1
-      timer = setTimeout( ()->
-        clickCount = 0
-        style =
-          top:    e.pageY,
-          left:   e.pageX,
-        Note.create "create a new note", style
-      , 300)
-    else
-      clickCount = 0
-      Stroke.drawingStroke = Stroke.create( {x: e.pageX, y: e.pageY} )
-      clearTimeout timer
-   .on 'dblclick', (e)->
-    e.preventDefault()
-
-  canvas.on 'mousemove', (e)->
-    return unless Stroke.drawingStroke
-    Stroke.drawingStroke.addPath({x:e.pageX, y:e.pageY})
+  canvas
+    .on 'mousemove', (e)->
+      return unless Stroke.drawingStroke
+      Stroke.drawingStroke.addPath({x:e.pageX, y:e.pageY})
+    .on 'dblclick', (e)-> e.preventDefault()
+    .on 'click', canvasClickListner
+    .on 'mousedown mouseup', canvasHoldListner
 
   $(document).on 'keyup', (e)->
     console.log 'keyup', e.keyCode
