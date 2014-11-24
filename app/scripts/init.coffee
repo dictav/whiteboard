@@ -108,11 +108,12 @@ listenActions = ->
 
 
 init = ->
-    client = new WindowsAzure.MobileServiceClient(
-      'https://whiteboard.azure-mobile.net/',
-      'ayQItbHiEURdZHPJXAyjjTrIRXWUog83')
-    Note.table = client.getTable('todoitem')
-    Stroke.table = client.getTable('strokepath')
+  client = new WindowsAzure.MobileServiceClient(
+    "https://whiteboard.azure-mobile.net/",
+    "TiLMzcFCaJaUjuEmZycYLJjoJpIDve68"
+  )
+  Note.table = client.getTable('notes')
+  Stroke.table = client.getTable('strokes')
 
 handleError = (error) ->
   console.log "ERR",error
