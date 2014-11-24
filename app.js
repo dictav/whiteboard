@@ -163,9 +163,9 @@ listenActions = function() {
 
 init = function() {
   var client;
-  client = new WindowsAzure.MobileServiceClient('https://whiteboard.azure-mobile.net/', 'ayQItbHiEURdZHPJXAyjjTrIRXWUog83');
-  Note.table = client.getTable('todoitem');
-  return Stroke.table = client.getTable('strokepath');
+  client = new WindowsAzure.MobileServiceClient("https://whiteboard.azure-mobile.net/", "TiLMzcFCaJaUjuEmZycYLJjoJpIDve68");
+  Note.table = client.getTable('notes');
+  return Stroke.table = client.getTable('strokes');
 };
 
 handleError = function(error) {
