@@ -271,9 +271,12 @@ window.Note = (function() {
   }
 
   Note.prototype.insert = function() {
-    return Note.table.insert(this.item).then(function(data) {
-      return console.log('inserted note', data);
-    }, window.handleError);
+    return Note.table.insert(this.item).then((function(_this) {
+      return function(data) {
+        _this.item.id = data.id;
+        return console.log('inserted note', data);
+      };
+    })(this), window.handleError);
   };
 
   Note.prototype.update = function(data) {
