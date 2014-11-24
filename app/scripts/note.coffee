@@ -51,7 +51,8 @@ class window.Note
 
   insert: ->
     Note.table.insert(@item)
-      .then( (data)->
+      .then( (data)=>
+        @item.id = data.id
         console.log 'inserted note', data
       , window.handleError)
 
